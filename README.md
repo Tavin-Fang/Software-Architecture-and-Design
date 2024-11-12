@@ -1,6 +1,6 @@
 # 实验室设备管理系统 个人作业文档
 
-###### 17373240 赵婉如
+###### 
 
 
 
@@ -18,7 +18,7 @@
 
 ## 系统结构设计
 
-源码上传[GitHub](https://github.com/Ryan0v0/SoftwareEngineering_Project)
+
 
 
 
