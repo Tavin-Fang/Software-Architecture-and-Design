@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block title %}用户权限管理{% endblock %}
+
+{% block page_content %}
+<div class="container">
+    <h2 class="text-center">用户权限管理</h2>
+    <p class="text-center">仅管理员可更改用户的删除权限</p>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>用户ID</th>
+                <th>用户名</th>
+                <th>账号</th>
+                <th>删除权限</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.number }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('manage_permissions') }}">
+                        {{ form.hidden_tag() }}
+                        {{ form.user_id(value=user.id, type="hidden") }}
+                        {{ form.can_del(checked=user.can_del) }}
+                        {{ form.submit(class="btn btn-primary btn-sm") }}
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h3>设备详情</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered">
+                        <tr>
+                            <th>设备编号</th>
+                            <td>{{ device.device_id }}</td>
+                        </tr>
+                        <tr>
+                            <th>设备名称</th>
+                            <td>{{ device.name }}</td>
+                        </tr>
+                        <tr>
+                            <th>实验室名称</th>
+                            <td>{{ device.lab }}</td>
+                        </tr>
+                        <tr>
+                            <th>购置人</th>
+                            <td>{{ device.user.username }}</td>
+                        </tr>
+                        <tr>
+                            <th>购置时间</th>
+                            <td>{{ device.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        </tr>
+                    </table>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">返回设备列表</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
