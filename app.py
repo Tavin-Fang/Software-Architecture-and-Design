@@ -227,6 +227,19 @@ class DeviceForm(FlaskForm):
 views
 '''
 
+
+@app.route('/my_borrowed_devices')
+@login_required
+def my_borrowed_devices():
+    # 查询当前用户正在租借且未归还的设备
+    borrowed_devices = BorrowRecord.query.filter_by(user_id=current_user.id, return_time=None).all()
+    return render_template('my_borrowed_devices.html', borrowed_devices=borrowed_devices)
+
+
+
+
+
+
 from datetime import datetime
 
 
