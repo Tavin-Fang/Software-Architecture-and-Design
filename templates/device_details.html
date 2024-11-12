@@ -9,6 +9,7 @@
                     <h3>设备详情</h3>
                 </div>
                 <div class="card-body">
+                    <!-- 设备详情表格 -->
                     <table class="table table-bordered">
                         <tr>
                             <th>设备编号</th>
@@ -30,12 +31,58 @@
                             <th>购置时间</th>
                             <td>{{ device.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                         </tr>
+                        <tr>
+                            <th>租借状态</th>
+                            <td>{{ '已借出' if device.is_borrowed else '可租借' }}</td>
+                        </tr>
                     </table>
+
+                    <!-- 租借和归还按钮 -->
                     <div class="text-center mt-3">
-                        <a href="{{ url_for('index') }}" class="btn btn-secondary">返回设备列表</a>
+                        {% if device.is_borrowed %}
+                            <form action="{{ url_for('return_device', device_id=device.id) }}" method="post">
+                                <button type="submit" class="btn btn-warning">归还设备</button>
+                            </form>
+                        {% else %}
+                            <form action="{{ url_for('borrow_device', device_id=device.id) }}" method="post">
+                                <button type="submit" class="btn btn-primary">租借设备</button>
+                            </form>
+                        {% endif %}
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary mt-2">返回设备列表</a>
                     </div>
                 </div>
             </div>
+
+            <!-- 租借记录历史表格 -->
+            {% if device.borrow_records %}
+                <div class="card mt-4">
+                    <div class="card-header text-center">
+                        <h4>租借记录历史</h4>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>用户</th>
+                                    <th>租借时间</th>
+                                    <th>归还时间</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in device.borrow_records %}
+                                    <tr>
+                                        <td>{{ record.user.username }}</td>
+                                        <td>{{ record.borrow_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                        <td>{{ record.return_time.strftime('%Y-%m-%d %H:%M:%S') if record.return_time else '未归还' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-center mt-4">暂无租借记录</p>
+            {% endif %}
         </div>
     </div>
 </div>

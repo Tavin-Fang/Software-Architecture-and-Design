@@ -59,6 +59,20 @@ login_manager.login_message = u"你需要登录才能访问这个页面."
 '''
 Models
 '''
+class BorrowRecord(db.Model):
+    __tablename__ = 'borrow_records'
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.Integer, db.ForeignKey('devices.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    borrow_time = db.Column(db.DateTime, default=datetime.utcnow)
+    return_time = db.Column(db.DateTime, nullable=True)
+
+    # 定义外键关联
+    device = db.relationship('Device', backref='borrow_records')
+    user = db.relationship('User', backref='borrow_records')
+
+    def __repr__(self):
+        return '<BorrowRecord device_id=%r, user_id=%r>' % (self.device_id, self.user_id)
 
 
 class Role(db.Model):
@@ -131,6 +145,9 @@ class Device(UserMixin, db.Model):
     name = db.Column(db.String(64), index=True)
     time = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.String(64), db.ForeignKey('users.id'))
+
+    # 添加 is_borrowed 字段
+    is_borrowed = db.Column(db.Boolean, default=False)
 
     def __init__(self, **kwargs):
         super(Device, self).__init__(**kwargs)
@@ -209,6 +226,42 @@ class DeviceForm(FlaskForm):
 '''
 views
 '''
+
+from datetime import datetime
+
+
+@app.route('/borrow_device/<int:device_id>', methods=['POST'])
+@login_required
+def borrow_device(device_id):
+    device = Device.query.get_or_404(device_id)
+    if device.is_borrowed:
+        flash(u'设备已被租借')
+        return redirect(url_for('device_details', id=device_id))
+
+    # 创建租借记录并更新设备状态
+    record = BorrowRecord(device_id=device.id, user_id=current_user.id)
+    device.is_borrowed = True
+    db.session.add(record)
+    db.session.commit()
+    flash(u'设备已成功租借')
+    return redirect(url_for('device_details', id=device_id))
+
+
+@app.route('/return_device/<int:device_id>', methods=['POST'])
+@login_required
+def return_device(device_id):
+    device = Device.query.get_or_404(device_id)
+    if not device.is_borrowed:
+        flash(u'设备未被租借')
+        return redirect(url_for('device_details', id=device_id))
+
+    # 查找最近的未归还记录并更新归还时间
+    record = BorrowRecord.query.filter_by(device_id=device.id, return_time=None).first()
+    record.return_time = datetime.utcnow()
+    device.is_borrowed = False
+    db.session.commit()
+    flash(u'设备已成功归还')
+    return redirect(url_for('device_details', id=device_id))
 
 
 @app.route('/device/<int:id>', methods=['GET'])
