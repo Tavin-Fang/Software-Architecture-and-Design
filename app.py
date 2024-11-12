@@ -18,6 +18,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
+from flask_mail import Mail, Message
+
+
 
 
 
@@ -55,6 +58,26 @@ login_manager = LoginManager(app)
 login_manager.session_protection = 'strong'
 login_manager.login_view = 'login'
 login_manager.login_message = u"你需要登录才能访问这个页面."
+
+
+# 配置企业微信邮箱的 SMTP 和 IMAP 设置
+
+
+
+
+app.config['MAIL_SERVER'] = 'smtp.exmail.qq.com'  # 企业微信的SMTP服务器
+app.config['MAIL_PORT'] = 465  # 使用SSL的端口
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = 'Service@tavin.cn'  # 你的企业微信邮箱地址
+app.config['MAIL_PASSWORD'] = 'Cyq3kU7iYUyJiedD'  # 授权码或应用密码
+app.config['MAIL_DEFAULT_SENDER'] = ('实验室设备', 'Service@tavin.cn')
+
+mail = Mail(app)
+def send_email(to, subject, template, **kwargs):
+    msg = Message(subject, recipients=[to])
+    msg.body = render_template(template + '.txt', **kwargs)  # 纯文本模板
+    msg.html = render_template(template + '.html', **kwargs)  # HTML模板
+    mail.send(msg)
 
 '''
 Models
@@ -237,6 +260,55 @@ class DeviceForm(FlaskForm):
 '''
 views
 '''
+@app.route('/admin/borrowed_devices', methods=['GET', 'POST'])
+@login_required
+def admin_borrowed_devices():
+    # 检查管理员权限
+    if current_user.role.name != 'Admin':
+        flash(u'只有管理员可以访问此页面')
+        return redirect(url_for('index'))
+
+    # 查询所有正在租借中的记录
+    borrowed_devices = BorrowRecord.query.filter_by(return_time=None).all()
+    return render_template('admin_borrowed_devices.html', borrowed_devices=borrowed_devices)
+
+
+
+
+def send_return_reminder(user, device):
+    send_email(
+        user.number,  # 假设用户的邮箱在 `number` 字段
+        '设备归还提醒',
+        'email/return_reminder',  # 模板名为 `return_reminder`
+        user=user,
+        device=device
+    )
+
+@app.route('/send_return_reminder/<int:user_id>/<int:device_id>', methods=['POST'])
+@login_required
+def send_return_reminder1(user_id, device_id):
+    # 检查管理员权限
+    if current_user.role.name != 'Admin':
+        flash(u'只有管理员可以访问此页面')
+        return redirect(url_for('index'))
+
+    user = User.query.get_or_404(user_id)
+    device = Device.query.get_or_404(device_id)
+
+    # 发送归还提醒邮件
+    send_return_reminder(user, device)
+    flash(f'已向用户 {user.username} 发送设备归还提醒')
+    return redirect(url_for('admin_borrowed_devices'))
+
+
+
+
+
+
+
+
+
+
 
 
 @app.route('/profile', methods=['GET', 'POST'])
@@ -284,8 +356,27 @@ def borrow_device(device_id):
     device.is_borrowed = True
     db.session.add(record)
     db.session.commit()
+
+    # 发送租借提醒邮件，包含租借时间
+    send_email(
+        current_user.number,  # 假设 `number` 字段是用户的邮箱
+        '设备租借提醒',
+        'email/borrow_notification',  # 假设模板名为 `borrow_notification`
+        user=current_user,
+        device=device,
+        borrow_time=record.borrow_time.strftime('%Y-%m-%d %H:%M:%S')  # 格式化日期
+    )
+
     flash(u'设备已成功租借')
     return redirect(url_for('device_details', id=device_id))
+
+
+
+
+
+
+
+
 
 
 @app.route('/return_device/<int:device_id>', methods=['POST'])

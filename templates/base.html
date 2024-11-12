@@ -25,10 +25,15 @@
                     <li>
                         <a href="{{ url_for('profile') }}">{{ current_user.username }}</a>
                     </li>
-
+                {% if current_user.role.name == 'Admin' %}
                     <li>
                         <a href="{{ url_for('manage_permissions') }}">用户权限管理</a>
                     </li>
+
+                    <li>
+                           <a href="{{ url_for('admin_borrowed_devices') }}">管理员面板</a>
+                    </li>
+                    {% endif %}
                     <li>
                         <a href="{{ url_for('my_borrowed_devices') }}">我的租借</a>
                     </li>

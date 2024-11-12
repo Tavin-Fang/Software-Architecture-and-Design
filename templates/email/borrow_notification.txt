@@ -1,0 +1,6 @@
+尊敬的{{ user.username }}，您好！
+
+您已成功租借设备：{{ device.name }}。
+租借时间：{{ borrow_time }}
+
+感谢您的使用！
