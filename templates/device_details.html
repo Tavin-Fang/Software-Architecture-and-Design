@@ -40,9 +40,13 @@
                     <!-- 租借和归还按钮 -->
                     <div class="text-center mt-3">
                         {% if device.is_borrowed %}
-                            <form action="{{ url_for('return_device', device_id=device.id) }}" method="post">
-                                <button type="submit" class="btn btn-warning">归还设备</button>
-                            </form>
+                            {% if is_borrowed_by_current_user %}
+                                <form action="{{ url_for('return_device', device_id=device.id) }}" method="post">
+                                    <button type="submit" class="btn btn-warning">归还设备</button>
+                                </form>
+                            {% else %}
+                                <p class="text-danger">设备已被他人租借</p>
+                            {% endif %}
                         {% else %}
                             <form action="{{ url_for('borrow_device', device_id=device.id) }}" method="post">
                                 <button type="submit" class="btn btn-primary">租借设备</button>

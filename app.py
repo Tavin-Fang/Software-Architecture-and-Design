@@ -400,16 +400,16 @@ def return_device(device_id):
 @login_required
 def device_details(id):
     device = Device.query.get_or_404(id)
-    return render_template('device_details.html', device=device)
 
+    # 检查是否是当前用户借的设备
+    current_borrow_record = BorrowRecord.query.filter_by(device_id=device.id, return_time=None).first()
+    if current_borrow_record:
+        is_borrowed_by_current_user = current_borrow_record.user_id == current_user.id
+    else:
+        is_borrowed_by_current_user = False
 
-
-
-
-
-
-
-
+    return render_template('device_details.html', device=device,
+                           is_borrowed_by_current_user=is_borrowed_by_current_user)
 
 
 @app.route('/manage-permissions', methods=['GET', 'POST'])
@@ -528,9 +528,9 @@ def login():
         user = User.query.filter_by(number=form.number.data).first()
         if user is not None and user.validate_password(
                 form.password_hash.data):  # user.verify_password(form.password.data):
-            if user.role != Role.query.filter_by(name='Admin').first():
-                flash(u'系统只对管理员开放，请联系管理员获得权限！')
-            else:
+            # if user.role != Role.query.filter_by(name='Admin').first():
+            #     flash(u'系统只对管理员开放，请联系管理员获得权限！')
+            # else:
                 login_user(user, form.remember_me.data)
                 return redirect(url_for('index'))
         flash(u'用户名或密码错误！')
