@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h3 class="text-center">个人信息</h3>
+    <form method="POST" action="{{ url_for('profile') }}">
+        {{ form.hidden_tag() }}
+        <div class="form-group">
+            {{ form.username.label(class="form-label") }}
+            {{ form.username(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ form.number.label(class="form-label") }}
+            {{ form.number(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ form.phone_number.label(class="form-label") }}
+            {{ form.phone_number(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ form.password.label(class="form-label") }}
+            {{ form.password(class="form-control", placeholder="如果不修改密码，请留空") }}
+        </div>
+        <button type="submit" class="btn btn-primary">保存更改</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary ml-2">取消</a>
+    </form>
+</div>
+{% endblock %}

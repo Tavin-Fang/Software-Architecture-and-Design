@@ -105,7 +105,9 @@ class User(UserMixin, db.Model):
     devices = db.relationship('Device', backref='user', lazy='dynamic')
     can_del = db.Column(db.Boolean, default=False)  # 新增的权限属性，默认为 False
 
-    # 其他方法保持不变
+    # 添加新字段
+
+    phone_number = db.Column(db.String(15), unique=True)
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -167,6 +169,15 @@ Forms
 '''
 
 
+class ProfileForm(FlaskForm):
+    username = StringField('用户名', validators=[DataRequired(), Length(1, 64)])
+    number = StringField('邮箱', validators=[DataRequired(), Length(1, 64)])
+    phone_number = StringField('手机号', validators=[DataRequired(), Length(1, 15)])
+    password = PasswordField('新密码', validators=[Length(0, 32)])
+    submit = SubmitField('保存更改')
+
+
+
 class LoginForm(FlaskForm):
     number = StringField(u'账号', validators=[DataRequired(), Length(1, 32)])
     password_hash = PasswordField(u'密码', validators=[DataRequired(), Length(1, 32)])
@@ -226,6 +237,23 @@ class DeviceForm(FlaskForm):
 '''
 views
 '''
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    form = ProfileForm(obj=current_user)
+    if form.validate_on_submit():
+        current_user.username = form.username.data
+        current_user.number = form.number.data
+        current_user.phone_number = form.phone_number.data
+        if form.password.data:
+            current_user.set_password(form.password.data)  # 更新密码
+        db.session.commit()
+        flash('您的信息已成功更新')
+        return redirect(url_for('profile'))
+    return render_template('profile.html', form=form)
+
 
 
 @app.route('/my_borrowed_devices')
