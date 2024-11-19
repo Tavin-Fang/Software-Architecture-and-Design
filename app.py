@@ -1,586 +1,514 @@
 # coding=utf-8
-import os
-from datetime import datetime
+import os  # 导入操作系统模块
+from datetime import datetime  # 导入日期时间模块的datetime类
 from flask import Flask, render_template, session, redirect, \
-    url_for, flash, current_app, request
-from flask_script import Manager, Shell
-from flask_migrate import Migrate, MigrateCommand
-from flask_bootstrap import Bootstrap
+    url_for, flash, current_app, request  # 从Flask框架中导入必要的类和函数
+from flask_script import Manager, Shell  # 导入Flask-Script的Manager和Shell类
+from flask_migrate import Migrate, MigrateCommand  # 导入Flask-Migrate的Migrate和MigrateCommand类
+from flask_bootstrap import Bootstrap  # 导入Flask-Bootstrap扩展
 from flask_login import UserMixin, LoginManager, login_required, \
-    login_user, logout_user, current_user
-from flask_wtf import FlaskForm
+    login_user, logout_user, current_user  # 导入Flask-Login相关的类和装饰器
+from flask_wtf import FlaskForm  # 导入Flask-WTF的FlaskForm类
 from wtforms import StringField, PasswordField, SubmitField, SelectField, \
-    BooleanField, IntegerField, ValidationError
-from wtforms.validators import DataRequired, Required, Length, Regexp
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.exc import IntegrityError
-from werkzeug.security import generate_password_hash, check_password_hash
+    BooleanField, IntegerField, ValidationError  # 导入WTForms中的字段类型和验证器
+from wtforms.validators import DataRequired, Required, Length, Regexp  # 导入WTForms中的验证器
+from flask_sqlalchemy import SQLAlchemy  # 导入Flask-SQLAlchemy扩展
+from sqlalchemy.exc import IntegrityError  # 导入SQLAlchemy的完整性错误异常
+from werkzeug.security import generate_password_hash, check_password_hash  # 导入Werkzeug的密码哈希生成和验证函数
 
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError  # 重复导入WTForms的验证器
+from flask_mail import Mail, Message  # 导入Flask-Mail的Mail和Message类
 
-from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
-from flask_mail import Mail, Message
+import random  # 导入随机数模块
+from xpinyin import Pinyin  # 导入xpinyin模块用于拼音转换
+from faker import Faker  # 导入Faker模块用于生成假数据
 
+fake = Faker('zh_CN')  # 创建一个Faker实例，用于生成中文假数据
+total = 15  # 初始化总数为15
 
-
-
-
-import random
-from xpinyin import Pinyin
-from faker import Faker
-
-fake = Faker('zh_CN')
-total=15
 '''
 Config
 '''
-basedir = os.path.abspath(os.path.dirname(__file__))
-
+basedir = os.path.abspath(os.path.dirname(__file__))  # 获取当前文件的绝对路径
 
 def make_shell_context():
-    return dict(app=app, db=db, Device=Device, User=User, Role=Role)
+    return dict(app=app, db=db, Device=Device, User=User, Role=Role)  # 定义Shell上下文，便于在命令行中访问这些对象
 
-
-app = Flask(__name__)
+app = Flask(__name__)  # 创建Flask应用实例
 app.config['SQLALCHEMY_DATABASE_URI'] = \
-    'sqlite:///' + os.path.join(basedir, 'data.sqlite')
-app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['AdminPassword'] = 666666
-app.config['SECRET_KEY'] = "this is a secret_key"
-db = SQLAlchemy(app)
-manager = Manager(app)
-bootstrap = Bootstrap(app)
-migrate = Migrate(app, db)
-manager.add_command('db', MigrateCommand)
-manager.add_command('shell', Shell(make_shell_context))
-login_manager = LoginManager(app)
+    'sqlite:///' + os.path.join(basedir, 'data.sqlite')  # 配置SQLAlchemy数据库URI，使用SQLite数据库
+app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True  # 配置在请求结束时自动提交数据库会话
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 禁用SQLAlchemy的事件系统，减少开销
+app.config['AdminPassword'] = 666666  # 配置管理员密码
+app.config['SECRET_KEY'] = "this is a secret_key"  # 配置应用的密钥，用于会话和表单保护
+db = SQLAlchemy(app)  # 初始化SQLAlchemy对象
+manager = Manager(app)  # 初始化Flask-Script的Manager对象
+bootstrap = Bootstrap(app)  # 初始化Flask-Bootstrap
+migrate = Migrate(app, db)  # 初始化Flask-Migrate
+manager.add_command('db', MigrateCommand)  # 添加数据库迁移命令
+manager.add_command('shell', Shell(make_shell_context))  # 添加Shell命令，带有上下文
+login_manager = LoginManager(app)  # 初始化Flask-Login的LoginManager
 
-login_manager.session_protection = 'strong'
-login_manager.login_view = 'login'
-login_manager.login_message = u"你需要登录才能访问这个页面."
-
+login_manager.session_protection = 'strong'  # 设置会话保护级别为strong
+login_manager.login_view = 'login'  # 设置登录视图函数
+login_manager.login_message = u"你需要登录才能访问这个页面."  # 设置未登录时的提示信息
 
 # 配置企业微信邮箱的 SMTP 和 IMAP 设置
 
+app.config['MAIL_SERVER'] = 'smtp.exmail.qq.com'  # 设置SMTP服务器地址
+app.config['MAIL_PORT'] = 465  # 设置SMTP服务器端口，使用SSL
+app.config['MAIL_USE_SSL'] = True  # 启用SSL
+app.config['MAIL_USERNAME'] = 'Service@tavin.cn'  # 设置邮箱用户名
+app.config['MAIL_PASSWORD'] = 'Cyq3kU7iYUyJiedD'  # 设置邮箱密码或授权码
+app.config['MAIL_DEFAULT_SENDER'] = ('实验室设备', 'Service@tavin.cn')  # 设置默认发送者信息
 
-
-
-app.config['MAIL_SERVER'] = 'smtp.exmail.qq.com'  # 企业微信的SMTP服务器
-app.config['MAIL_PORT'] = 465  # 使用SSL的端口
-app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = 'Service@tavin.cn'  # 你的企业微信邮箱地址
-app.config['MAIL_PASSWORD'] = 'Cyq3kU7iYUyJiedD'  # 授权码或应用密码
-app.config['MAIL_DEFAULT_SENDER'] = ('实验室设备', 'Service@tavin.cn')
-
-mail = Mail(app)
+mail = Mail(app)  # 初始化Flask-Mail
 def send_email(to, subject, template, **kwargs):
-    msg = Message(subject, recipients=[to])
-    msg.body = render_template(template + '.txt', **kwargs)  # 纯文本模板
-    msg.html = render_template(template + '.html', **kwargs)  # HTML模板
-    mail.send(msg)
+    msg = Message(subject, recipients=[to])  # 创建邮件消息对象
+    msg.body = render_template(template + '.txt', **kwargs)  # 渲染纯文本邮件内容
+    msg.html = render_template(template + '.html', **kwargs)  # 渲染HTML邮件内容
+    mail.send(msg)  # 发送邮件
+
+
+
+
+
+
 
 '''
 Models
 '''
 class BorrowRecord(db.Model):
-    __tablename__ = 'borrow_records'
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey('devices.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    borrow_time = db.Column(db.DateTime, default=datetime.utcnow)
-    return_time = db.Column(db.DateTime, nullable=True)
+    __tablename__ = 'borrow_records'  # 定义表名为borrow_records
+    id = db.Column(db.Integer, primary_key=True)  # 定义主键id
+    device_id = db.Column(db.Integer, db.ForeignKey('devices.id'))  # 定义外键关联到devices表的id
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))  # 定义外键关联到users表的id
+    borrow_time = db.Column(db.DateTime, default=datetime.utcnow)  # 借出时间，默认当前时间
+    return_time = db.Column(db.DateTime, nullable=True)  # 归还时间，允许为空
 
     # 定义外键关联
-    device = db.relationship('Device', backref='borrow_records')
-    user = db.relationship('User', backref='borrow_records')
+    device = db.relationship('Device', backref='borrow_records')  # 与Device模型的关系
+    user = db.relationship('User', backref='borrow_records')  # 与User模型的关系
 
     def __repr__(self):
-        return '<BorrowRecord device_id=%r, user_id=%r>' % (self.device_id, self.user_id)
-
+        return '<BorrowRecord device_id=%r, user_id=%r>' % (self.device_id, self.user_id)  # 定义对象的字符串表示
 
 class Role(db.Model):
-    __tablename__ = 'roles'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64), unique=True)
-    users = db.relationship('User', backref='role', lazy='dynamic')
+    __tablename__ = 'roles'  # 定义表名为roles
+    id = db.Column(db.Integer, primary_key=True)  # 定义主键id
+    name = db.Column(db.String(64), unique=True)  # 角色名称，唯一
+    users = db.relationship('User', backref='role', lazy='dynamic')  # 定义与User模型的关系
 
     @staticmethod
     def insert_roles():
-        roles = ('Student', 'Admin')
+        roles = ('Student', 'Admin')  # 定义角色名称
         for r in roles:
-            role = Role.query.filter_by(name=r).first()
+            role = Role.query.filter_by(name=r).first()  # 查询是否存在该角色
             if role is None:
-                role = Role(name=r)
-            db.session.add(role)
-        db.session.commit()
+                role = Role(name=r)  # 如果不存在，则创建
+            db.session.add(role)  # 添加到数据库会话
+        db.session.commit()  # 提交会话
 
     def __repr__(self):
-        return '<Role %r>' % self.name
-
+        return '<Role %r>' % self.name  # 定义对象的字符串表示
 
 class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    number = db.Column(db.SmallInteger, unique=True, index=True)
-    username = db.Column(db.String(64), unique=True, index=True)
-    password_hash = db.Column(db.String(128), unique=True, default=123456)
-    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
-    devices = db.relationship('Device', backref='user', lazy='dynamic')
-    can_del = db.Column(db.Boolean, default=False)  # 新增的权限属性，默认为 False
+    __tablename__ = 'users'  # 定义表名为users
+    id = db.Column(db.Integer, primary_key=True)  # 定义主键id
+    number = db.Column(db.SmallInteger, unique=True, index=True)  # 用户号码，唯一并建立索引
+    username = db.Column(db.String(64), unique=True, index=True)  # 用户名，唯一并建立索引
+    password_hash = db.Column(db.String(128), unique=True, default=123456)  # 密码哈希，唯一，默认值为123456
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))  # 定义外键关联到roles表的id
+    devices = db.relationship('Device', backref='user', lazy='dynamic')  # 定义与Device模型的关系
+    can_del = db.Column(db.Boolean, default=False)  # 删除权限，默认为False
 
     # 添加新字段
-
-    phone_number = db.Column(db.String(15), unique=True)
+    phone_number = db.Column(db.String(15), unique=True)  # 电话号码，唯一
 
     def __init__(self, **kwargs):
-        super(User, self).__init__(**kwargs)
+        super(User, self).__init__(**kwargs)  # 调用父类的初始化方法
         if self.role is None:
-            self.role = Role.query.filter_by(name='Student').first()
-
+            self.role = Role.query.filter_by(name='Student').first()  # 如果没有指定角色，默认设置为Student
 
     def __repr__(self):
-        return '<User %r>' % self.username
+        return '<User %r>' % self.username  # 定义对象的字符串表示
 
     def validate_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return check_password_hash(self.password_hash, password)  # 验证密码是否正确
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password)  # 设置密码哈希
 
     # 初次运行程序时生成初始管理员的静态方法
     @staticmethod
     def generate_admin():
-        admin = Role.query.filter_by(name='Admin').first()
-        u = User.query.filter_by(role=admin).first()
+        admin = Role.query.filter_by(name='Admin').first()  # 查询Admin角色
+        u = User.query.filter_by(role=admin).first()  # 查询是否存在Admin用户
         if u is None:
-            u = User(number='zhaowrenee@gmail.com', username='Admin', role=Role.query.filter_by(name='Admin').first())
-            u.set_password('666666')
-            db.session.add(u)
-        db.session.commit()
+            u = User(number='zhaowrenee@gmail.com', username='Admin', role=Role.query.filter_by(name='Admin').first())  # 创建Admin用户
+            u.set_password('666666')  # 设置密码
+            db.session.add(u)  # 添加到数据库会话
+        db.session.commit()  # 提交会话
 
     def verify_password(self, password):
-        return self.password == password
-
+        return self.password == password  # 验证密码（此方法可能有误，应使用password_hash）
 
 class Device(UserMixin, db.Model):
-    __tablename__ = 'devices'
-    id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.String(64), unique=True)
-    lab = db.Column(db.String(64), unique=True, index=True)
-    name = db.Column(db.String(64), index=True)
-    time = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.String(64), db.ForeignKey('users.id'))
+    __tablename__ = 'devices'  # 定义表名为devices
+    id = db.Column(db.Integer, primary_key=True)  # 定义主键id
+    device_id = db.Column(db.String(64), unique=True)  # 设备唯一ID，唯一
+    lab = db.Column(db.String(64), unique=True, index=True)  # 实验室名称，唯一并建立索引
+    name = db.Column(db.String(64), index=True)  # 设备名称，建立索引
+    time = db.Column(db.DateTime, default=datetime.utcnow)  # 创建时间，默认当前时间
+    user_id = db.Column(db.String(64), db.ForeignKey('users.id'))  # 定义外键关联到users表的id
 
     # 添加 is_borrowed 字段
-    is_borrowed = db.Column(db.Boolean, default=False)
+    is_borrowed = db.Column(db.Boolean, default=False)  # 设备是否被借出，默认为False
 
     def __init__(self, **kwargs):
-        super(Device, self).__init__(**kwargs)
+        super(Device, self).__init__(**kwargs)  # 调用父类的初始化方法
         # 新添加的实验设备，初始其购置人为管理员。
         if self.user is None:
-            self.user = User.query.filter_by(username='Admin').first()
+            self.user = User.query.filter_by(username='Admin').first()  # 如果没有指定用户，默认设置为Admin
 
     def __repr__(self):
-        return '<Device %r>' % self.name
+        return '<Device %r>' % self.name  # 定义对象的字符串表示
 
     def set_deviceID(self, str):
-        self.device_id = str
-
+        self.device_id = str  # 设置设备ID
 
 '''
 Forms
 '''
 
-
 class ProfileForm(FlaskForm):
-    username = StringField('用户名', validators=[DataRequired(), Length(1, 64)])
-    number = StringField('邮箱', validators=[DataRequired(), Length(1, 64)])
-    phone_number = StringField('手机号', validators=[DataRequired(), Length(1, 15)])
-    password = PasswordField('新密码', validators=[Length(0, 32)])
-    submit = SubmitField('保存更改')
-
-
+    username = StringField('用户名', validators=[DataRequired(), Length(1, 64)])  # 用户名字段，必填，长度1-64
+    number = StringField('邮箱', validators=[DataRequired(), Length(1, 64)])  # 邮箱字段，必填，长度1-64
+    phone_number = StringField('手机号', validators=[DataRequired(), Length(1, 15)])  # 手机号字段，必填，长度1-15
+    password = PasswordField('新密码', validators=[Length(0, 32)])  # 新密码字段，长度0-32
+    submit = SubmitField('保存更改')  # 提交按钮
 
 class LoginForm(FlaskForm):
-    number = StringField(u'账号', validators=[DataRequired(), Length(1, 32)])
-    password_hash = PasswordField(u'密码', validators=[DataRequired(), Length(1, 32)])
-    remember_me = BooleanField(u'记住我')
-    submit = SubmitField(u'登录')
-
+    number = StringField(u'账号', validators=[DataRequired(), Length(1, 32)])  # 账号字段，必填，长度1-32
+    password_hash = PasswordField(u'密码', validators=[DataRequired(), Length(1, 32)])  # 密码字段，必填，长度1-32
+    remember_me = BooleanField(u'记住我')  # 记住我复选框
+    submit = SubmitField(u'登录')  # 登录按钮
 
 class RegisterForm(FlaskForm):
-    number = StringField(u'账号', validators=[DataRequired(), Length(1, 32)])
-    username = StringField(u'用户名', validators=[DataRequired(), Length(1, 64)])
-    password = PasswordField(u'密码', validators=[DataRequired(), Length(1, 32)])
+    number = StringField(u'账号', validators=[DataRequired(), Length(1, 32)])  # 账号字段，必填，长度1-32
+    username = StringField(u'用户名', validators=[DataRequired(), Length(1, 64)])  # 用户名字段，必填，长度1-64
+    password = PasswordField(u'密码', validators=[DataRequired(), Length(1, 32)])  # 密码字段，必填，长度1-32
     confirm_password = PasswordField(u'确认密码', validators=[
         DataRequired(), Length(1, 32),
         EqualTo('password', message=u'密码必须匹配')  # 确保两次输入的密码一致
     ])
-    submit = SubmitField(u'注册')
-
-
-
-
-
+    submit = SubmitField(u'注册')  # 注册按钮
 
 class PermissionForm(FlaskForm):
-    user_id = IntegerField('用户ID', validators=[DataRequired()])
-    can_del = BooleanField('删除权限')
-    submit = SubmitField('更新权限')
-
-
-
-
+    user_id = IntegerField('用户ID', validators=[DataRequired()])  # 用户ID字段，必填
+    can_del = BooleanField('删除权限')  # 删除权限复选框
+    submit = SubmitField('更新权限')  # 更新权限按钮
 
 class SearchForm(FlaskForm):
-    name = StringField(u'设备名', validators=[DataRequired()])
-    submit = SubmitField(u'搜索')
-
+    name = StringField(u'设备名', validators=[DataRequired()])  # 设备名字段，必填
+    submit = SubmitField(u'搜索')  # 搜索按钮
 
 class DeviceForm(FlaskForm):
-    name = StringField(u'设备名', validators=[DataRequired(), Length(1, 32)])
-    lab = StringField(u'实验室名', validators=[DataRequired(), Length(1, 32)])
-    user_name = StringField(u'购置人')
+    name = StringField(u'设备名', validators=[DataRequired(), Length(1, 32)])  # 设备名字段，必填，长度1-32
+    lab = StringField(u'实验室名', validators=[DataRequired(), Length(1, 32)])  # 实验室名字段，必填，长度1-32
+    user_name = StringField(u'购置人')  # 购置人字段
     # if not User.query.filter_by(username=user_name.data).first():
-    #	raise ValidationError(u'用户不存在')
+    #    raise ValidationError(u'用户不存在')
     # validate_name(user_name)
     # user_id = IntegerField(u'设备号', validators=[Required(message=u'请输入数字')])
-    submit = SubmitField(u'添加')
+    submit = SubmitField(u'添加')  # 添加按钮
     '''
     def validate_number(self, field):
         if Device.query.filter_by(id=field.data).first():
             raise ValidationError(u'此设备已存在，请检查考号！')
     '''
-
     def validate_user_name(self, field):
         if not User.query.filter_by(username=field.data).first():
-            raise ValidationError(u'用户不存在')
-
+            raise ValidationError(u'用户不存在')  # 验证购置人是否存在
 
 '''
 views
 '''
 @app.route('/admin/borrowed_devices', methods=['GET', 'POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def admin_borrowed_devices():
     # 检查管理员权限
     if current_user.role.name != 'Admin':
-        flash(u'只有管理员可以访问此页面')
-        return redirect(url_for('index'))
+        flash(u'只有管理员可以访问这个页面')  # 提示信息
+        return redirect(url_for('index'))  # 重定向到首页
 
     # 查询所有正在租借中的记录
     borrowed_devices = BorrowRecord.query.filter_by(return_time=None).all()
-    return render_template('admin_borrowed_devices.html', borrowed_devices=borrowed_devices)
-
-
-
+    return render_template('admin_borrowed_devices.html', borrowed_devices=borrowed_devices)  # 渲染模板
 
 def send_return_reminder(user, device):
     send_email(
         user.number,  # 假设用户的邮箱在 `number` 字段
-        '设备归还提醒',
+        '设备归还提醒',  # 邮件主题
         'email/return_reminder',  # 模板名为 `return_reminder`
-        user=user,
-        device=device
+        user=user,  # 传递用户对象
+        device=device  # 传递设备对象
     )
 
 @app.route('/send_return_reminder/<int:user_id>/<int:device_id>', methods=['POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def send_return_reminder1(user_id, device_id):
     # 检查管理员权限
     if current_user.role.name != 'Admin':
-        flash(u'只有管理员可以访问此页面')
-        return redirect(url_for('index'))
+        flash(u'只有管理员可以访问这个页面')  # 提示信息
+        return redirect(url_for('index'))  # 重定向到首页
 
-    user = User.query.get_or_404(user_id)
-    device = Device.query.get_or_404(device_id)
+    user = User.query.get_or_404(user_id)  # 获取用户，如果不存在则返回404
+    device = Device.query.get_or_404(device_id)  # 获取设备，如果不存在则返回404
 
     # 发送归还提醒邮件
     send_return_reminder(user, device)
-    flash(f'已向用户 {user.username} 发送设备归还提醒')
-    return redirect(url_for('admin_borrowed_devices'))
-
-
-
-
-
-
-
-
-
-
-
+    flash(f'已向用户 {user.username} 发送设备归还提醒')  # 提示信息
+    return redirect(url_for('admin_borrowed_devices'))  # 重定向到管理员借出设备页面
 
 @app.route('/profile', methods=['GET', 'POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def profile():
-    form = ProfileForm(obj=current_user)
+    form = ProfileForm(obj=current_user)  # 创建个人资料表单，预填充当前用户数据
     if form.validate_on_submit():
-        current_user.username = form.username.data
-        current_user.number = form.number.data
-        current_user.phone_number = form.phone_number.data
+        current_user.username = form.username.data  # 更新用户名
+        current_user.number = form.number.data  # 更新账号
+        current_user.phone_number = form.phone_number.data  # 更新手机号
         if form.password.data:
-            current_user.set_password(form.password.data)  # 更新密码
-        db.session.commit()
-        flash('您的信息已成功更新')
-        return redirect(url_for('profile'))
-    return render_template('profile.html', form=form)
-
-
+            current_user.set_password(form.password.data)  # 如果填写了新密码，则更新密码
+        db.session.commit()  # 提交更改
+        flash('您的信息已成功更新')  # 提示信息
+        return redirect(url_for('profile'))  # 重定向到个人资料页面
+    return render_template('profile.html', form=form)  # 渲染个人资料模板
 
 @app.route('/my_borrowed_devices')
-@login_required
+@login_required  # 需要登录才能访问
 def my_borrowed_devices():
     # 查询当前用户正在租借且未归还的设备
     borrowed_devices = BorrowRecord.query.filter_by(user_id=current_user.id, return_time=None).all()
-    return render_template('my_borrowed_devices.html', borrowed_devices=borrowed_devices)
+    return render_template('my_borrowed_devices.html', borrowed_devices=borrowed_devices)  # 渲染模板
 
-
-
-
-
-
-from datetime import datetime
-
+from datetime import datetime  # 重复导入datetime模块
 
 @app.route('/borrow_device/<int:device_id>', methods=['POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def borrow_device(device_id):
-    device = Device.query.get_or_404(device_id)
+    device = Device.query.get_or_404(device_id)  # 获取设备，如果不存在则返回404
     if device.is_borrowed:
-        flash(u'设备已被租借')
-        return redirect(url_for('device_details', id=device_id))
+        flash(u'设备已被租借')  # 提示信息
+        return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
 
     # 创建租借记录并更新设备状态
-    record = BorrowRecord(device_id=device.id, user_id=current_user.id)
-    device.is_borrowed = True
-    db.session.add(record)
-    db.session.commit()
+    record = BorrowRecord(device_id=device.id, user_id=current_user.id)  # 创建租借记录
+    device.is_borrowed = True  # 设置设备为已借出
+    db.session.add(record)  # 添加记录到会话
+    db.session.commit()  # 提交会话
 
     # 发送租借提醒邮件，包含租借时间
     send_email(
         current_user.number,  # 假设 `number` 字段是用户的邮箱
-        '设备租借提醒',
-        'email/borrow_notification',  # 假设模板名为 `borrow_notification`
-        user=current_user,
-        device=device,
-        borrow_time=record.borrow_time.strftime('%Y-%m-%d %H:%M:%S')  # 格式化日期
+        '设备租借提醒',  # 邮件主题
+        'email/borrow_notification',  # 模板名为 `borrow_notification`
+        user=current_user,  # 传递当前用户对象
+        device=device,  # 传递设备对象
+        borrow_time=record.borrow_time.strftime('%Y-%m-%d %H:%M:%S')  # 格式化租借时间
     )
 
-    flash(u'设备已成功租借')
-    return redirect(url_for('device_details', id=device_id))
-
-
-
-
-
-
-
-
-
+    flash(u'设备已成功租借')  # 提示信息
+    return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
 
 @app.route('/return_device/<int:device_id>', methods=['POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def return_device(device_id):
-    device = Device.query.get_or_404(device_id)
+    device = Device.query.get_or_404(device_id)  # 获取设备，如果不存在则返回404
     if not device.is_borrowed:
-        flash(u'设备未被租借')
-        return redirect(url_for('device_details', id=device_id))
+        flash(u'设备未被租借')  # 提示信息
+        return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
 
     # 查找最近的未归还记录并更新归还时间
     record = BorrowRecord.query.filter_by(device_id=device.id, return_time=None).first()
-    record.return_time = datetime.utcnow()
-    device.is_borrowed = False
-    db.session.commit()
-    flash(u'设备已成功归还')
-    return redirect(url_for('device_details', id=device_id))
-
+    record.return_time = datetime.utcnow()  # 设置归还时间为当前时间
+    device.is_borrowed = False  # 设置设备为未借出
+    db.session.commit()  # 提交更改
+    flash(u'设备已成功归还')  # 提示信息
+    return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
 
 @app.route('/device/<int:id>', methods=['GET'])
-@login_required
+@login_required  # 需要登录才能访问
 def device_details(id):
-    device = Device.query.get_or_404(id)
+    device = Device.query.get_or_404(id)  # 获取设备，如果不存在则返回404
 
     # 检查是否是当前用户借的设备
     current_borrow_record = BorrowRecord.query.filter_by(device_id=device.id, return_time=None).first()
     if current_borrow_record:
-        is_borrowed_by_current_user = current_borrow_record.user_id == current_user.id
+        is_borrowed_by_current_user = current_borrow_record.user_id == current_user.id  # 判断是否为当前用户借出
     else:
-        is_borrowed_by_current_user = False
+        is_borrowed_by_current_user = False  # 如果没有借出记录，则为False
 
     return render_template('device_details.html', device=device,
-                           is_borrowed_by_current_user=is_borrowed_by_current_user)
-
+                           is_borrowed_by_current_user=is_borrowed_by_current_user)  # 渲染设备详情模板
 
 @app.route('/manage-permissions', methods=['GET', 'POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def manage_permissions():
     if not current_user.is_authenticated or current_user.role.name != 'Admin':
-        flash(u'只有管理员可以访问此页面')
-        return redirect(url_for('index'))
+        flash(u'只有管理员可以访问这个页面')  # 提示信息
+        return redirect(url_for('index'))  # 重定向到首页
 
-    form = PermissionForm()
+    form = PermissionForm()  # 创建权限表单
     users = User.query.all()  # 获取所有用户
 
     if form.validate_on_submit():
-        user = User.query.get(form.user_id.data)
+        user = User.query.get(form.user_id.data)  # 获取指定ID的用户
         if user:
-            user.can_del = form.can_del.data
-            db.session.commit()
-            flash(u'权限已更新')
+            user.can_del = form.can_del.data  # 更新用户的删除权限
+            db.session.commit()  # 提交更改
+            flash(u'权限已更新')  # 提示信息
         else:
-            flash(u'用户不存在')
-        return redirect(url_for('manage_permissions'))
+            flash(u'用户不存在')  # 提示信息
+        return redirect(url_for('manage_permissions'))  # 重定向到权限管理页面
 
-    return render_template('manage_permissions.html', form=form, users=users)
-
+    return render_template('manage_permissions.html', form=form, users=users)  # 渲染权限管理模板
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    form = RegisterForm()
+    form = RegisterForm()  # 创建注册表单
     if form.validate_on_submit():
         # 检查用户名或账号是否已经存在
         if User.query.filter_by(number=form.number.data).first() or \
                 User.query.filter_by(username=form.username.data).first():
-            flash(u'账号或用户名已存在')
-            return redirect(url_for('register'))
+            flash(u'账号或用户名已存在')  # 提示信息
+            return redirect(url_for('register'))  # 重定向到注册页面
 
         # 创建新用户
         new_user = User(
             number=form.number.data,
             username=form.username.data,
-            role=Role.query.filter_by(name='Student').first()
+            role=Role.query.filter_by(name='Student').first()  # 设置用户角色为Student
         )
-        new_user.set_password(form.password.data)
+        new_user.set_password(form.password.data)  # 设置用户密码
 
         # 将用户保存到数据库
-        db.session.add(new_user)
+        db.session.add(new_user)  # 添加新用户到会话
         try:
-            db.session.commit()
-            flash(u'注册成功！请登录')
-            return redirect(url_for('login'))
+            db.session.commit()  # 提交会话
+            flash(u'注册成功！请登录')  # 提示信息
+            return redirect(url_for('login'))  # 重定向到登录页面
         except IntegrityError:
-            db.session.rollback()
-            flash(u'注册失败，请重试')
+            db.session.rollback()  # 回滚会话
+            flash(u'注册失败，请重试')  # 提示信息
 
-    return render_template('register.html', form=form)
-
+    return render_template('register.html', form=form)  # 渲染注册页面模板
 
 @app.route('/', methods=['GET', 'POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def index():
-    form = SearchForm()
-    admin = Role.query.filter_by(name='Admin').first()
+    form = SearchForm()  # 创建搜索表单
+    admin = Role.query.filter_by(name='Admin').first()  # 获取Admin角色
     if form.validate_on_submit():
-        # 获得设备列表，其id包含form中的数字
+        # 获得设备列表，其名称包含表单中的名称
         devices = Device.query.filter(Device.name.like('%{}%'.format(form.name.data))).all()
     else:
-        devices = Device.query.order_by(Device.id.asc(), Device.name.desc()).all()
-    return render_template('index.html', form=form, devices=devices, admin=admin)
-
+        devices = Device.query.order_by(Device.id.asc(), Device.name.desc()).all()  # 获取所有设备，按id升序和名称降序排序
+    return render_template('index.html', form=form, devices=devices, admin=admin)  # 渲染首页模板
 
 # 增加新设备
 @app.route('/add-device', methods=['GET', 'POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def add_device():
-    form = DeviceForm()
+    form = DeviceForm()  # 创建设备表单
     if form.validate_on_submit():
         global total
-        total = total + 1
-        print(total)
+        total = total + 1  # 更新设备总数
+        print(total)  # 打印当前总数
         device = Device(lab=form.lab.data, name=form.name.data,
-                        user=User.query.filter_by(username=form.user_name.data).first())
+                        user=User.query.filter_by(username=form.user_name.data).first())  # 创建设备对象
         device.set_deviceID(
-            "2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(total).zfill(3))
-        db.session.add(device)
-        flash(u'成功添加设备')
-        return redirect(url_for('index'))
-    return render_template('add_device.html', form=form)
-
+            "2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(total).zfill(3))  # 设置设备ID
+        db.session.add(device)  # 添加设备到会话
+        flash(u'成功添加设备')  # 提示信息
+        return redirect(url_for('index'))  # 重定向到首页
+    return render_template('add_device.html', form=form)  # 渲染添加设备页面模板
 
 # 移除设备
 @app.route('/remove-device/<int:id>', methods=['GET', 'POST'])
-@login_required
+@login_required  # 需要登录才能访问
 def remove_device(id):
-    device = Device.query.get_or_404(id)
+    device = Device.query.get_or_404(id)  # 获取设备，如果不存在则返回404
 
     # 检查删除权限
     if not current_user.can_del:
-        flash(u'没有权限删除设备')
-        return redirect(url_for('index'))
+        flash(u'没有权限删除设备')  # 提示信息
+        return redirect(url_for('index'))  # 重定向到首页
 
     # 如果当前用户是管理员，可以删除设备
     if device.user == User.query.filter_by(username='Admin').first():
-        flash(u'不能删除管理员添加的设备')
+        flash(u'不能删除管理员添加的设备')  # 提示信息
     else:
-        db.session.delete(device)
-        flash(u'成功删除此设备')
+        db.session.delete(device)  # 删除设备
+        flash(u'成功删除此设备')  # 提示信息
 
-    return redirect(url_for('index'))
-
-
+    return redirect(url_for('index'))  # 重定向到首页
 
 # 登录，系统只允许管理员登录
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    form = LoginForm()
+    form = LoginForm()  # 创建登录表单
     if form.validate_on_submit():
-        user = User.query.filter_by(number=form.number.data).first()
+        user = User.query.filter_by(number=form.number.data).first()  # 根据账号查询用户
         if user is not None and user.validate_password(
-                form.password_hash.data):  # user.verify_password(form.password.data):
+                form.password_hash.data):  # 验证用户存在且密码正确
             # if user.role != Role.query.filter_by(name='Admin').first():
             #     flash(u'系统只对管理员开放，请联系管理员获得权限！')
             # else:
-                login_user(user, form.remember_me.data)
-                return redirect(url_for('index'))
-        flash(u'用户名或密码错误！')
-    return render_template('login.html', form=form)
-
+                login_user(user, form.remember_me.data)  # 登录用户，设置记住我
+                return redirect(url_for('index'))  # 重定向到首页
+        flash(u'用户名或密码错误！')  # 提示信息
+    return render_template('login.html', form=form)  # 渲染登录页面模板
 
 @app.route('/logout')
-@login_required
+@login_required  # 需要登录才能访问
 def logout():
-    logout_user()
-    flash(u'成功注销！')
-    return redirect(url_for('login'))
-
+    logout_user()  # 注销用户
+    flash(u'成功注销！')  # 提示信息
+    return redirect(url_for('login'))  # 重定向到登录页面
 
 @app.errorhandler(404)
 def page_not_found(e):
-    return render_template('404.html'), 404
-
+    return render_template('404.html'), 404  # 渲染404错误页面
 
 @app.errorhandler(500)
 def internal_server_error(e):
-    return render_template('500.html'), 500
-
+    return render_template('500.html'), 500  # 渲染500错误页面
 
 # 加载用户的回调函数
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
-
+    return User.query.get(int(user_id))  # 根据用户ID加载用户对象
 
 '''
 fake
 '''
 
 list = [u'联想启天2100', u'方正文祥600', u'DSP实验箱', u'功率变换器', u'双踪示波器', u'联想电脑845E', u'曙光天阔服务器', u'ZigBee开发套件', u'专业VR镜头',
-        u'投影机']
-
+        u'投影机']  # 定义设备名称列表
 
 def fake_user(count=10):
     for i in range(count):
         user = User(username=fake.name(),
                     number=fake.email(),
-                    role_id=2)
-        user.set_password('123456')
-        db.session.add(user)
+                    role_id=2)  # 创建假用户，角色ID为2（假设为Student）
+        user.set_password('123456')  # 设置假用户密码
+        db.session.add(user)  # 添加用户到会话
         try:
-            db.session.commit()
+            db.session.commit()  # 提交会话
         except IntegrityError:
-            db.session.rollback()
-
+            db.session.rollback()  # 回滚会话以处理重复或错误
 
 def fake_device(count=10):
     #total = count
@@ -588,35 +516,33 @@ def fake_device(count=10):
         device = Device(name=random.choice(list),
                         user=User.query.get(random.randint(1, User.query.count())),
                         time=fake.date_time_this_year(),
-                        lab=fake.company()[:-4] + "实验室")
+                        lab=fake.company()[:-4] + "实验室")  # 创建假设备对象
         #device.set_deviceID(
         #    str(device.time[0:3]) + "-" + str(Pinyin().get_initials(device.lab[0:3], u'')) + "-" + str(i))
         device.set_deviceID(
-            "2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(i+1).zfill(3))
-        #print("2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(i+1))
-        db.session.add(device)
-        # print(str(device.time[0:3])+"-"+str(Pinyin().get_initials(device.lab[0:3],u''))+"-"+str(i))
+            "2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(i+1).zfill(3))  # 设置设备ID
+        #print("2020-" + Pinyin().get_initials(device.lab, u'') + "-" + str(i+1))
+        db.session.add(device)  # 添加设备到会话
+        # print(str(device.time[0:3])+"-"+str(Pinyin().get_initials(device.lab,u''))+"-"+str(i))
     try:
-        db.session.commit()
+        db.session.commit()  # 提交会话
     except IntegrityError:
-        db.session.rollback()
+        db.session.rollback()  # 回滚会话以处理重复或错误
 
 '''
 增加命令'python app.py init' 
 以增加身份与初始管理员帐号
 '''
 
-
 @manager.command
 def init():
-    from app import Role, User
-    db.drop_all()
-    db.create_all()
-    Role.insert_roles()
-    User.generate_admin()
-    fake_user(10)
-    fake_device(15)
-
+    from app import Role, User  # 导入Role和User模型
+    db.drop_all()  # 删除所有数据库表
+    db.create_all()  # 创建所有数据库表
+    Role.insert_roles()  # 插入角色数据
+    User.generate_admin()  # 生成初始管理员用户
+    fake_user(10)  # 生成10个假用户
+    fake_device(15)  # 生成15个假设备
 
 if __name__ == '__main__':
-    manager.run()
+    manager.run()  # 运行管理器
