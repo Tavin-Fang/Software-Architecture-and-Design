@@ -70,7 +70,67 @@ def send_email(to, subject, template, **kwargs):
     mail.send(msg)  # 发送邮件
 
 
+# ```
+# yiyan
+# ```
+from requests import Session
+import diskcache as dc
+from rich.console import Console
+from rich.markdown import Markdown
 
+class YiYan:
+    def __init__(self, appid, ak, sk):
+        self.appid = appid
+        self.ak = ak
+        self.sk = sk
+        self.s = Session()
+        headers = {'Content-Type': 'application/json'}
+        self.s.headers.update(headers)
+        self.cache = dc.Cache('./cache')
+
+    def get_access_token(self):
+        key = 'access_token'
+        access_token = self.cache.get(key)
+        if not access_token:
+            response = self.s.post(
+                f'https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={self.ak}&client_secret={self.sk}',
+                json='""'
+            )
+            access_token = response.json()['access_token']
+            self.cache.set(key, access_token, expire=60 * 60 * 24 * 1)
+        return access_token
+
+    def generate_content(self, question):
+        access_token = self.get_access_token()
+        url = f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/eb-instant?access_token={access_token}"
+        data = {"messages": [{"role": "user", "content": question}]}
+        response = self.s.post(url, json=data)
+        result = response.json()['result']
+        return result
+yiyan = YiYan(
+    appid='115657247',
+    ak='ATB4TtphGuNszmaKf4aHEbJ3',
+    sk='zgD67ytH43jOD8r7NkvPM3zeOGMb6Y9W'
+)
+@app.route('/chatbot', methods=['GET', 'POST'])
+def chatbot():
+    response = None
+    if request.method == 'POST':
+        user_input = request.form.get('user_input')  # 获取用户输入
+        if user_input:
+            response = yiyan.generate_content(user_input)  # 调用智能客服接口
+    return render_template('chatbot.html', response=response)  # 渲染客服页面
+
+
+from flask import jsonify
+
+@app.route('/chatbot/ask', methods=['POST'])
+def chatbot_ask():
+    user_input = request.json.get('user_input')  # 获取用户输入
+    if not user_input:
+        return jsonify({'error': '问题不能为空'}), 400
+    response = yiyan.generate_content(user_input)  # 调用智能客服接口
+    return jsonify({'response': response})  # 返回响应
 
 
 
@@ -124,6 +184,7 @@ class User(UserMixin, db.Model):
 
     # 添加新字段
     phone_number = db.Column(db.String(15), unique=True)  # 电话号码，唯一
+    can_add_device = db.Column(db.Boolean, default=False) #1119
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)  # 调用父类的初始化方法
@@ -204,10 +265,12 @@ class RegisterForm(FlaskForm):
     ])
     submit = SubmitField(u'注册')  # 注册按钮
 
+#添加设备权限1119
 class PermissionForm(FlaskForm):
-    user_id = IntegerField('用户ID', validators=[DataRequired()])  # 用户ID字段，必填
-    can_del = BooleanField('删除权限')  # 删除权限复选框
-    submit = SubmitField('更新权限')  # 更新权限按钮
+    user_id = IntegerField('用户ID', validators=[DataRequired()])
+    can_del = BooleanField('删除权限')
+    can_add_device = BooleanField('添加设备权限')  # 1119
+    submit = SubmitField('更新权限')
 
 class SearchForm(FlaskForm):
     name = StringField(u'设备名', validators=[DataRequired()])  # 设备名字段，必填
@@ -354,26 +417,28 @@ def device_details(id):
                            is_borrowed_by_current_user=is_borrowed_by_current_user)  # 渲染设备详情模板
 
 @app.route('/manage-permissions', methods=['GET', 'POST'])
-@login_required  # 需要登录才能访问
+@login_required
 def manage_permissions():
     if not current_user.is_authenticated or current_user.role.name != 'Admin':
-        flash(u'只有管理员可以访问这个页面')  # 提示信息
-        return redirect(url_for('index'))  # 重定向到首页
+        flash(u'只有管理员可以访问这个页面')
+        return redirect(url_for('index'))
 
-    form = PermissionForm()  # 创建权限表单
-    users = User.query.all()  # 获取所有用户
+    form = PermissionForm()
+    users = User.query.all()
 
     if form.validate_on_submit():
-        user = User.query.get(form.user_id.data)  # 获取指定ID的用户
+        user = User.query.get(form.user_id.data)
         if user:
-            user.can_del = form.can_del.data  # 更新用户的删除权限
-            db.session.commit()  # 提交更改
-            flash(u'权限已更新')  # 提示信息
+            user.can_del = form.can_del.data
+            user.can_add_device = form.can_add_device.data  # 更新添加设备权限
+            db.session.commit()
+            flash(u'权限已更新')
         else:
-            flash(u'用户不存在')  # 提示信息
-        return redirect(url_for('manage_permissions'))  # 重定向到权限管理页面
+            flash(u'用户不存在')
+        return redirect(url_for('manage_permissions'))
 
-    return render_template('manage_permissions.html', form=form, users=users)  # 渲染权限管理模板
+    return render_template('manage_permissions.html', form=form, users=users)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -419,21 +484,25 @@ def index():
 
 # 增加新设备
 @app.route('/add-device', methods=['GET', 'POST'])
-@login_required  # 需要登录才能访问
+@login_required
 def add_device():
-    form = DeviceForm()  # 创建设备表单
+    if not current_user.can_add_device:  # 检查权限
+        flash(u'您没有权限添加设备')
+        return redirect(url_for('index'))
+
+    form = DeviceForm()
     if form.validate_on_submit():
         global total
-        total = total + 1  # 更新设备总数
-        print(total)  # 打印当前总数
+        total += 1
         device = Device(lab=form.lab.data, name=form.name.data,
-                        user=User.query.filter_by(username=form.user_name.data).first())  # 创建设备对象
+                        user=User.query.filter_by(username=form.user_name.data).first())
         device.set_deviceID(
-            "2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(total).zfill(3))  # 设置设备ID
-        db.session.add(device)  # 添加设备到会话
-        flash(u'成功添加设备')  # 提示信息
-        return redirect(url_for('index'))  # 重定向到首页
-    return render_template('add_device.html', form=form)  # 渲染添加设备页面模板
+            "2020-" + Pinyin().get_initials(device.lab, u'')[0:2] + "-" + str(total).zfill(3))
+        db.session.add(device)
+        flash(u'成功添加设备')
+        return redirect(url_for('index'))
+    return render_template('add_device.html', form=form)
+
 
 # 移除设备
 @app.route('/remove-device/<int:id>', methods=['GET', 'POST'])

@@ -6,7 +6,7 @@
 {% block page_content %}
 <div class="container">
     <h2 class="text-center">用户权限管理</h2>
-    <p class="text-center">仅管理员可更改用户的删除权限</p>
+    <p class="text-center">仅管理员可更改用户的权限</p>
 
     <table class="table table-striped">
         <thead>
@@ -15,6 +15,8 @@
                 <th>用户名</th>
                 <th>账号</th>
                 <th>删除权限</th>
+                <th>添加设备权限</th>
+                <th>操作</th>
             </tr>
         </thead>
         <tbody>
@@ -24,11 +26,22 @@
                 <td>{{ user.username }}</td>
                 <td>{{ user.number }}</td>
                 <td>
-                    <form method="post" action="{{ url_for('manage_permissions') }}">
+                    <form method="post" action="{{ url_for('manage_permissions') }}" class="d-flex align-items-center">
                         {{ form.hidden_tag() }}
                         {{ form.user_id(value=user.id, type="hidden") }}
-                        {{ form.can_del(checked=user.can_del) }}
-                        {{ form.submit(class="btn btn-primary btn-sm") }}
+                        <div class="form-check form-switch me-3">
+                            {{ form.can_del(class="form-check-input", checked=user.can_del) }}
+                        </div>
+                </td>
+                <td>
+                    <div class="form-check form-switch me-3">
+                        {{ form.can_add_device(class="form-check-input", checked=user.can_add_device) }}
+                    </div>
+                </td>
+                <td>
+                    <div>
+                        <button type="submit" class="btn btn-primary btn-sm d-none update-btn">更新权限</button>
+                    </div>
                     </form>
                 </td>
             </tr>
@@ -36,4 +49,38 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            const initialState = {};
+            const inputs = form.querySelectorAll('input[type="checkbox"]');
+            const button = form.querySelector('.update-btn');
+
+            // 保存初始状态
+            inputs.forEach(input => {
+                initialState[input.name] = input.checked;
+            });
+
+            // 监听变化
+            inputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    let changed = false;
+                    inputs.forEach(i => {
+                        if (i.checked !== initialState[i.name]) {
+                            changed = true;
+                        }
+                    });
+                    // 显示或隐藏按钮
+                    if (changed) {
+                        button.classList.remove('d-none');
+                    } else {
+                        button.classList.add('d-none');
+                    }
+                });
+            });
+        });
+    });
+</script>
 {% endblock %}

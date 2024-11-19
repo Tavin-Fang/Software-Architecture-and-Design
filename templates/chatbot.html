@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block title %}Chatbot{% endblock %}
+
+{% block page_content %}
+<div class="container mt-5">
+    <!-- 系统标题 -->
+    <div class="text-center mb-4">
+        <h1 class="display-4 text-primary">智能客服</h1>
+        <p class="text-muted">随时解答您的问题，助力高效管理</p>
+    </div>
+
+    <!-- 聊天界面 -->
+    <div class="row align-items-center">
+        <!-- 聊天图片部分 -->
+        <div class="col-lg-6 col-md-12 mb-4">
+            <div class="text-center">
+                <img class="img-fluid rounded shadow animate__animated animate__fadeInLeft"
+                     src="{{ url_for('static', filename='chatbot.jpeg') }}"
+                     alt="Chatbot"
+                     width="600" height="400">
+                <p class="text-muted mt-2">智能交互，助您解答各种疑问</p>
+            </div>
+        </div>
+
+        <!-- 聊天窗口部分 -->
+        <div class="col-lg-6 col-md-12">
+            <div class="card shadow border-0 animate__animated animate__fadeInRight">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">与智能客服对话</h4>
+                </div>
+                <div class="card-body">
+                    <div id="chat-box" class="border rounded p-3 mb-3" style="height: 300px; overflow-y: auto; background-color: #f8f9fa;">
+                        <!-- 聊天内容 -->
+                    </div>
+                    <form id="chat-form">
+                        <div class="input-group">
+                            <input type="text" id="user-input" class="form-control" placeholder="请输入问题" required>
+                            <button type="submit" class="btn btn-primary">发送</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    /* 背景渐变优化 */
+    body {
+        background: linear-gradient(135deg, #d7e9ff, #f8fbff);
+        animation: backgroundScroll 8s infinite alternate;
+    }
+
+    @keyframes backgroundScroll {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 100% 50%; }
+    }
+
+    /* 聊天框样式 */
+    #chat-box {
+        font-family: 'Arial', sans-serif;
+        font-size: 0.9rem;
+        color: #333;
+    }
+    .message {
+        margin: 5px 0;
+    }
+    .user {
+        text-align: right;
+        color: blue;
+    }
+    .bot {
+        text-align: left;
+        color: green;
+    }
+    .bot .markdown {
+        background-color: #f9f9f9;
+        padding: 5px;
+        border-radius: 5px;
+    }
+
+    /* 动态按钮效果 */
+    .btn-primary {
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        border: none;
+        transition: background 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(45deg, #0056b3, #003f7f);
+    }
+</style>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // 处理表单提交
+        $('#chat-form').on('submit', function(e) {
+            e.preventDefault(); // 阻止表单的默认提交行为
+
+            const userInput = $('#user-input').val();
+            if (!userInput.trim()) {
+                alert('请输入问题');
+                return;
+            }
+
+            // 在聊天框显示用户的问题
+            $('#chat-box').append(`<div class="message user">用户: ${userInput}</div>`);
+
+            // 清空输入框
+            $('#user-input').val('');
+
+            // 向服务器发送异步请求
+            $.ajax({
+                url: '/chatbot/ask',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ user_input: userInput }),
+                success: function(data) {
+                    // 渲染 Markdown 并显示客服的回复
+                    const markdownHtml = marked.parse(data.response);
+                    $('#chat-box').append(`
+                        <div class="message bot">
+                            <div class="markdown">${markdownHtml}</div>
+                        </div>
+                    `);
+                    $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight); // 滚动到最新消息
+                },
+                error: function(err) {
+                    alert('请求失败，请稍后重试');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

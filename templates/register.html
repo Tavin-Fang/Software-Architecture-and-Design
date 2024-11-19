@@ -4,25 +4,108 @@
 {% block title %}Register{% endblock %}
 
 {% block page_content %}
-<div class="page-header">
-    <h1 style="text-align:center">实验室设备管理系统</h1>
-</div>
-<div class="jumbotron">
-    <div class="row">
-        <div class="col-md-8">
-            <img class="rounded img-fluid" src="{{ url_for('static', filename='cpu.jpeg') }}" width="100%" height="100%">
-        </div>
-        <div class="col-md-4">
-            <div class="card mb-3 w-100 bg-light">
-                <div class="card-header"><h4>欢迎！请注册</h4></div>
-                <a href="{{ url_for('login') }}">已有账号？登录</a>
+<div class="container mt-5">
+    <!-- 系统标题 -->
+    <div class="text-center mb-4">
+        <h1 class="display-4 text-primary">实验室设备管理系统</h1>
+        <p class="text-muted">高效管理实验室设备，轻松完成借还操作</p>
+    </div>
 
+    <!-- 注册界面 -->
+    <div class="row align-items-center">
+        <!-- 图片部分 -->
+        <div class="col-lg-7 col-md-12 mb-4">
+            <div class="text-center">
+                <img class="img-fluid rounded shadow animate__animated animate__fadeInLeft"
+                     src="{{ url_for('static', filename='cpu.jpeg') }}"
+                     alt="Lab Equipment"
+                     width="600" height="400">
+                <p class="text-muted mt-2">高效管理实验室设备的理想选择</p>
+            </div>
+        </div>
+
+        <!-- 注册表单部分 -->
+        <div class="col-lg-5 col-md-12">
+            <div class="card shadow border-0 animate__animated animate__fadeInRight">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">欢迎注册！😊</h4>
+                </div>
                 <div class="card-body">
-                    {{ wtf.quick_form(form) }}
-                    <hr>
+                    <p class="text-center text-muted">请填写以下信息，开启设备管理新体验！</p>
+                    {{ wtf.quick_form(form, novalidate=True) }}
+
+                    <!-- 额外提示 -->
+                    <div class="mt-4 text-center">
+                        <p class="text-muted mb-2">
+                            已有账号？
+                            <a href="{{ url_for('login') }}" class="text-primary font-weight-bold">立即登录</a>！
+                        </p>
+                        <p class="text-muted">
+                            遇到问题？随时联系
+                            <a href="mailto:support@labmanager.com" class="text-primary font-weight-bold">管理员</a>。
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
+
+<style>
+    /* 背景渐变优化 */
+    body {
+        background: linear-gradient(135deg, #d7e9ff, #f8fbff);
+        animation: backgroundScroll 8s infinite alternate;
+    }
+
+    @keyframes backgroundScroll {
+        0% { background-position: 0% 50%; }
+        100% { background-position: 100% 50%; }
+    }
+
+    /* 标题动画 */
+    h1 {
+        font-family: 'Arial', sans-serif;
+        font-weight: bold;
+        animation: bounceIn 1s ease-in-out;
+    }
+
+    /* 图片动画 */
+    img {
+        object-fit: cover;
+        border-radius: 15px;
+        transition: transform 0.5s ease, box-shadow 0.3s ease;
+    }
+
+    img:hover {
+        transform: scale(1.05);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 卡片动画 */
+    .card {
+        border-radius: 15px;
+        overflow: hidden;
+    }
+
+    .card-header {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    /* 动态按钮效果 */
+    .btn-primary {
+        background: linear-gradient(45deg, #007bff, #0056b3);
+        border: none;
+        transition: background 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(45deg, #0056b3, #003f7f);
+    }
+</style>
+
+<!-- 引入动画库 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" integrity="sha384-oS1A/ffuWiElRuD4/qeHxxEjeD9alJhxRx53WDxScQaDeBFSc11zCVJhsw3jqRm+" crossorigin="anonymous">
 {% endblock %}

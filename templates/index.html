@@ -4,7 +4,9 @@
 {% block page_content %}
 <div class="row">
     <div class="col-lg-6">
+       {% if current_user.can_add_device %}
         <a class="btn btn-info" href="{{ url_for('add_device') }}">添加新设备</a>
+        {% endif %}
     </div>
     <form class="form-inline" method="post" role="form">
         {{ form.hidden_tag() }}
