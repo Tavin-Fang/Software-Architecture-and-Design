@@ -298,16 +298,23 @@ class DeviceForm(FlaskForm):
 views
 '''
 @app.route('/admin/borrowed_devices', methods=['GET', 'POST'])
-@login_required  # 需要登录才能访问
+@login_required
 def admin_borrowed_devices():
     # 检查管理员权限
     if current_user.role.name != 'Admin':
-        flash(u'只有管理员可以访问这个页面')  # 提示信息
-        return redirect(url_for('index'))  # 重定向到首页
+        flash(u'只有管理员可以访问这个页面')
+        return redirect(url_for('index'))
 
-    # 查询所有正在租借中的记录
+    # 查询当前所有已借出的记录
     borrowed_devices = BorrowRecord.query.filter_by(return_time=None).all()
-    return render_template('admin_borrowed_devices.html', borrowed_devices=borrowed_devices)  # 渲染模板
+
+    # 查询所有用户的租借记录历史
+    all_borrow_records = BorrowRecord.query.order_by(BorrowRecord.borrow_time.desc()).all()
+
+    return render_template('admin_borrowed_devices.html',
+                           borrowed_devices=borrowed_devices,
+                           all_borrow_records=all_borrow_records)
+
 
 def send_return_reminder(user, device):
     send_email(
@@ -350,11 +357,20 @@ def profile():
     return render_template('profile.html', form=form)  # 渲染个人资料模板
 
 @app.route('/my_borrowed_devices')
-@login_required  # 需要登录才能访问
+@login_required
 def my_borrowed_devices():
-    # 查询当前用户正在租借且未归还的设备
+    # 当前租借的设备
     borrowed_devices = BorrowRecord.query.filter_by(user_id=current_user.id, return_time=None).all()
-    return render_template('my_borrowed_devices.html', borrowed_devices=borrowed_devices)  # 渲染模板
+
+    # 租借历史记录，包括已归还的设备
+    borrow_history = BorrowRecord.query.filter_by(user_id=current_user.id).all()
+
+    return render_template(
+        'my_borrowed_devices.html',
+        borrowed_devices=borrowed_devices,
+        borrow_history=borrow_history
+    )
+#1119
 
 from datetime import datetime  # 重复导入datetime模块
 
@@ -386,20 +402,20 @@ def borrow_device(device_id):
     return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
 
 @app.route('/return_device/<int:device_id>', methods=['POST'])
-@login_required  # 需要登录才能访问
+@login_required
 def return_device(device_id):
-    device = Device.query.get_or_404(device_id)  # 获取设备，如果不存在则返回404
+    device = Device.query.get_or_404(device_id)
     if not device.is_borrowed:
-        flash(u'设备未被租借')  # 提示信息
-        return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
+        return jsonify({'error': '设备未被租借'}), 400
 
     # 查找最近的未归还记录并更新归还时间
     record = BorrowRecord.query.filter_by(device_id=device.id, return_time=None).first()
-    record.return_time = datetime.utcnow()  # 设置归还时间为当前时间
-    device.is_borrowed = False  # 设置设备为未借出
-    db.session.commit()  # 提交更改
-    flash(u'设备已成功归还')  # 提示信息
-    return redirect(url_for('device_details', id=device_id))  # 重定向到设备详情页面
+    record.return_time = datetime.utcnow()
+    device.is_borrowed = False
+    db.session.commit()
+
+    return jsonify({'message': '设备已成功归还'}), 200
+#1119
 
 @app.route('/device/<int:id>', methods=['GET'])
 @login_required  # 需要登录才能访问
